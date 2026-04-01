@@ -1,6 +1,13 @@
 # HackNova 1.0 — PortfolioIQ Submission
 ## Team: [Byte Brains]
+## Team Code: 8
 ## Date: 01 April 2026
+
+## Team Members
+ 1. Sumantra Prajapati
+ 2. Mohammad Abdullah
+ 3. Kartavya Dixit
+ 4. Sanskar Kamboj
 
 ## Project Structure
 
