@@ -1,0 +1,4 @@
+Sector,Avg Sharpe Ratio,Avg Beta,Portfolio A Exposure (%),Portfolio B Exposure (%)
+Banking,0.15,1.0647,33.3,5.7
+IT,0.9227,0.8763,33.3,27.7
+Pharma,1.1786,0.4501,33.3,66.6

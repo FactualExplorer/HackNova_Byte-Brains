@@ -1,0 +1,158 @@
+{
+  "name": "PortfolioIQ - Price Alert Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 16 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300],
+      "notes": "Runs Mon-Fri at 4 PM IST (after NSE close)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuration: 3 stocks to monitor\nconst tickers = ['HDFCBANK.NS', 'TCS.NS', 'SUNPHARMA.NS'];\nconst tickerNames = ['HDFCBANK', 'TCS', 'SUNPHARMA'];\nconst threshold = 2.0; // Alert if move > 2%\n\nconst results = [];\n\nfor (let i = 0; i < tickers.length; i++) {\n  try {\n    // Fetch last 2 days of data from Yahoo Finance\n    const response = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://query1.finance.yahoo.com/v8/finance/chart/${tickers[i]}`,\n      qs: {\n        range: '5d',\n        interval: '1d'\n      },\n      headers: {\n        'User-Agent': 'Mozilla/5.0'\n      }\n    });\n    \n    const closes = response.chart.result[0].indicators.quote[0].close;\n    const validCloses = closes.filter(c => c !== null);\n    \n    if (validCloses.length >= 2) {\n      const currentClose = validCloses[validCloses.length - 1];\n      const previousClose = validCloses[validCloses.length - 2];\n      const changePercent = ((currentClose - previousClose) / previousClose) * 100;\n      \n      results.push({\n        ticker: tickerNames[i],\n        currentClose: currentClose.toFixed(2),\n        previousClose: previousClose.toFixed(2),\n        changePercent: changePercent.toFixed(2),\n        triggered: Math.abs(changePercent) > threshold,\n        direction: changePercent > 0 ? '📈 UP' : '📉 DOWN',\n        timestamp: new Date().toISOString()\n      });\n    }\n  } catch (error) {\n    results.push({\n      ticker: tickerNames[i],\n      error: error.message,\n      triggered: false\n    });\n  }\n}\n\nreturn results.map(r => ({ json: r }));"
+      },
+      "id": "fetch-prices",
+      "name": "Fetch Stock Prices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "notes": "Fetches close prices from Yahoo Finance for 3 stocks"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.triggered }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-threshold",
+      "name": "Check >2% Move",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "notes": "Filters stocks with >2% daily move"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet alertMessage = '🚨 PRICE ALERT — PortfolioIQ\\n\\n';\nalertMessage += 'The following stocks moved >2% today:\\n\\n';\n\nfor (const item of items) {\n  const d = item.json;\n  alertMessage += `${d.direction} ${d.ticker}\\n`;\n  alertMessage += `  Close: ₹${d.currentClose} (prev: ₹${d.previousClose})\\n`;\n  alertMessage += `  Change: ${d.changePercent}%\\n\\n`;\n}\n\nalertMessage += `\\n⏰ Generated: ${new Date().toLocaleString('en-IN', {timeZone: 'Asia/Kolkata'})}`;\n\nreturn [{ json: { alertMessage, subject: '🚨 PortfolioIQ Price Alert', timestamp: new Date().toISOString() } }];"
+      },
+      "id": "format-alert",
+      "name": "Format Alert Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 200],
+      "notes": "Formats the alert message with stock details"
+    },
+    {
+      "parameters": {
+        "fromEmail": "portfolioiq@example.com",
+        "toEmail": "fundmanager@example.com",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.alertMessage }}"
+      },
+      "id": "send-email",
+      "name": "Send Email Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1000, 200],
+      "notes": "Sends email alert to fund manager (configure SMTP credentials)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet summary = 'ℹ️ No stocks moved >2% today.\\n\\n';\n\nfor (const item of items) {\n  const d = item.json;\n  summary += `${d.ticker}: ${d.changePercent}% (within threshold)\\n`;\n}\n\nreturn [{ json: { message: summary } }];"
+      },
+      "id": "log-no-alert",
+      "name": "Log - No Alert Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 400],
+      "notes": "Logs when no stock triggered the threshold"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Stock Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Stock Prices": {
+      "main": [
+        [
+          {
+            "node": "Check >2% Move",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check >2% Move": {
+      "main": [
+        [
+          {
+            "node": "Format Alert Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log - No Alert Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert Message": {
+      "main": [
+        [
+          {
+            "node": "Send Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "HackNova",
+      "id": "1"
+    },
+    {
+      "name": "PortfolioIQ",
+      "id": "2"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-01T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,4 @@
+Sector,N_samples,RF_Accuracy,RF_F1,GB_Accuracy,GB_F1
+Banking,275,0.7127,0.7041,0.8255,0.8235
+IT,293,0.8328,0.858,0.9317,0.9438
+Pharma,305,0.8033,0.8137,0.8951,0.8904
