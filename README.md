@@ -1,5 +1,5 @@
-# HackNova 2.0 — PortfolioIQ Submission
-## Team: [YOUR TEAM NAME]
+# HackNova 1.0 — PortfolioIQ Submission
+## Team: [Byte Brains]
 ## Date: 01 April 2026
 
 ## Project Structure
