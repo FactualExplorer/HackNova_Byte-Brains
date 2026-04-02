@@ -15,7 +15,7 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-# ── Paths ──────────────────────────────────────────────────────────────────
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
@@ -60,15 +60,12 @@ def compute_sma_signals():
     for ticker in stocks:
         prices = adj_close[ticker].dropna()
         
-        # Compute SMAs
         sma_50 = prices.rolling(50).mean()
         sma_200 = prices.rolling(200).mean()
         
-        # Current values (as of last date)
         last_sma50 = sma_50.iloc[-1]
         last_sma200 = sma_200.iloc[-1]
         
-        # Determine signal
         if last_sma50 > last_sma200:
             signal = 'Golden Cross'
         elif last_sma50 < last_sma200:
@@ -76,13 +73,11 @@ def compute_sma_signals():
         else:
             signal = 'Neutral'
         
-        # Find last crossover date
         sma_diff = sma_50 - sma_200
         sma_diff = sma_diff.dropna()
         
         crossover_date = 'N/A'
         if len(sma_diff) > 1:
-            # Sign changes indicate crossovers
             sign_changes = (sma_diff > 0).astype(int).diff()
             crossovers = sign_changes[sign_changes != 0].dropna()
             if len(crossovers) > 0:
@@ -103,7 +98,6 @@ def compute_sma_signals():
     
     signal_df = pd.DataFrame(results)
     
-    # Save signal table
     csv_path = os.path.join(SUBMISSIONS_DIR, 'sma_signal_table.csv')
     signal_df.to_csv(csv_path, index=False)
     print(f"\n💾 SMA Signal Table saved: {csv_path}")
@@ -121,25 +115,21 @@ def generate_sma_chart(ticker, sector):
     sma_50 = prices.rolling(50).mean()
     sma_200 = prices.rolling(200).mean()
     
-    # Find all crossover points
     sma_diff = sma_50 - sma_200
     sma_diff = sma_diff.dropna()
     sign_changes = (sma_diff > 0).astype(int).diff()
     crossovers = sign_changes[sign_changes != 0].dropna()
     
-    # Create chart
     fig, ax = plt.subplots(figsize=(16, 8))
     fig.patch.set_facecolor('#0f172a')
     ax.set_facecolor('#1e293b')
     
     color = SECTOR_COLORS.get(sector, '#8b5cf6')
     
-    # Plot price and SMAs
     ax.plot(prices.index, prices, color=color, linewidth=1.5, alpha=0.9, label=f'{ticker} Price')
     ax.plot(sma_50.index, sma_50, color='#fbbf24', linewidth=1.8, linestyle='--', alpha=0.8, label='SMA-50')
     ax.plot(sma_200.index, sma_200, color='#f97316', linewidth=1.8, linestyle='-.', alpha=0.8, label='SMA-200')
     
-    # Fill between SMAs for visual clarity
     valid_idx = sma_200.dropna().index
     ax.fill_between(valid_idx, sma_50[valid_idx], sma_200[valid_idx],
                     where=sma_50[valid_idx] > sma_200[valid_idx],
@@ -148,7 +138,6 @@ def generate_sma_chart(ticker, sector):
                     where=sma_50[valid_idx] <= sma_200[valid_idx],
                     color='#ef4444', alpha=0.1, label='Bearish Zone')
     
-    # Mark crossover events
     for date, val in crossovers.items():
         if date in prices.index:
             price_at_cross = prices[date]
@@ -160,7 +149,7 @@ def generate_sma_chart(ticker, sector):
                           fontsize=9, color='#22c55e', fontweight='bold',
                           bbox=dict(boxstyle='round,pad=0.3', facecolor='#0f172a', edgecolor='#22c55e', alpha=0.8),
                           arrowprops=dict(arrowstyle='->', color='#22c55e', lw=1.5))
-            else:  # Death Cross
+            else:
                 ax.scatter(date, price_at_cross, color='#ef4444', s=200, zorder=10,
                           marker='v', edgecolors='white', linewidth=2)
                 ax.annotate('Death\nCross', (date, price_at_cross),
@@ -204,7 +193,7 @@ if __name__ == '__main__':
         generate_sma_chart(ticker, sector)
     
     print("\n" + "=" * 60)
-    print("✅ TASK 3 COMPLETE — Technical Signal Dashboard")
+    print("TASK 3 Complet — Technical Signal Dashboard")
     print("=" * 60)
     print(f"\nDeliverables:")
     print(f"  📊 submissions/sma_signal_table.csv")

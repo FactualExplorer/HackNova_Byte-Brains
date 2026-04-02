@@ -14,12 +14,10 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-# ── Paths ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
 SUBMISSIONS_DIR = os.path.join(BASE_DIR, 'submissions')
 
-# ── Colors ─────────────────────────────────────────────────────────────────
 BG_DARK = RGBColor(0x0f, 0x17, 0x2a)
 BG_CARD = RGBColor(0x1e, 0x29, 0x3b)
 TEXT_WHITE = RGBColor(0xff, 0xff, 0xff)
@@ -111,7 +109,6 @@ def add_table_to_slide(slide, df, left, top, width, height, font_size=9):
     table_shape = slide.shapes.add_table(rows + 1, cols, left, top, width, height)
     table = table_shape.table
     
-    # Header row
     for j, col_name in enumerate(df.columns):
         cell = table.cell(0, j)
         cell.text = str(col_name)
@@ -123,7 +120,6 @@ def add_table_to_slide(slide, df, left, top, width, height, font_size=9):
         cell.fill.solid()
         cell.fill.fore_color.rgb = RGBColor(0x33, 0x41, 0x55)
     
-    # Data rows
     for i in range(rows):
         for j in range(cols):
             cell = table.cell(i + 1, j)
@@ -158,9 +154,7 @@ def create_presentation():
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
     
-    blank_layout = prs.slide_layouts[6]  # Blank layout
-    
-    # Load data
+    blank_layout = prs.slide_layouts[6]
     try:
         metrics = pd.read_csv(os.path.join(SUBMISSIONS_DIR, 'metrics_summary.csv'))
     except:
@@ -186,7 +180,6 @@ def create_presentation():
     except:
         sector_breakdown = pd.DataFrame()
     
-    # ═══ SLIDE 1: Data ════════════════════════════════════════════════════════
     print("  📄 Slide 1: Data Overview...")
     slide1 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide1)
@@ -214,7 +207,6 @@ def create_presentation():
     ]
     add_multi_text_box(slide1, Inches(0.7), Inches(1.4), Inches(12), Inches(5.5), data_lines)
     
-    # ═══ SLIDE 2: Risk-Return Map ═════════════════════════════════════════════
     print("  📄 Slide 2: Risk-Return Map...")
     slide2 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide2)
@@ -224,14 +216,12 @@ def create_presentation():
     safe_add_picture(slide2, os.path.join(CHARTS_DIR, 'risk_return_scatter.png'),
                      Inches(0.3), Inches(1.2), Inches(8.5), Inches(5.8))
     
-    # Add correlation heatmap as a smaller inset
     safe_add_picture(slide2, os.path.join(CHARTS_DIR, 'correlation_heatmap.png'),
                      Inches(9), Inches(1.2), Inches(4), Inches(3.5))
     
     add_text_box(slide2, Inches(9), Inches(4.9), Inches(4), Inches(0.3),
                  "Daily Returns Correlation Heatmap", size=10, color=TEXT_GRAY, bold=True)
     
-    # Key insights placeholder
     insight_lines = [
         ("KEY OBSERVATIONS", 11, ACCENT_CYAN, True),
         ("• Banking cluster: Moderate vol, correlated", 10, TEXT_GRAY, False),
@@ -241,7 +231,6 @@ def create_presentation():
     ]
     add_multi_text_box(slide2, Inches(9), Inches(5.3), Inches(4), Inches(2), insight_lines)
     
-    # ═══ SLIDE 3: Top & Bottom Stocks ═════════════════════════════════════════
     print("  📄 Slide 3: Top & Bottom Stocks...")
     slide3 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide3)
@@ -265,14 +254,12 @@ def create_presentation():
         add_table_to_slide(slide3, bot3.reset_index(drop=True),
                           Inches(0.5), Inches(4.3), Inches(12.3), Inches(1.5), font_size=11)
         
-        # Sector breakdown table
         if not sector_breakdown.empty:
             add_text_box(slide3, Inches(0.7), Inches(6.1), Inches(4), Inches(0.3),
                         "📊 Sector Averages", size=13, color=ACCENT_CYAN, bold=True)
             add_table_to_slide(slide3, sector_breakdown,
                               Inches(0.5), Inches(6.4), Inches(8), Inches(0.9), font_size=10)
     
-    # ═══ SLIDE 4: SMA Signals ═════════════════════════════════════════════════
     print("  📄 Slide 4: SMA Signals...")
     slide4 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide4)
@@ -283,7 +270,6 @@ def create_presentation():
         add_table_to_slide(slide4, sma_signals,
                           Inches(0.3), Inches(1.4), Inches(7.5), Inches(4.5), font_size=10)
     
-    # Add one SMA chart as preview
     sma_chart = os.path.join(CHARTS_DIR, 'sma_banking.png')
     if safe_add_picture(slide4, sma_chart, Inches(8), Inches(1.4), Inches(5), Inches(2.8)):
         add_text_box(slide4, Inches(8), Inches(4.3), Inches(5), Inches(0.3),
@@ -294,25 +280,21 @@ def create_presentation():
         add_text_box(slide4, Inches(8), Inches(7.0), Inches(5), Inches(0.3),
                      "TCS — SMA Overlay (IT)", size=9, color=TEXT_GRAY, bold=True)
     
-    # ═══ SLIDE 5: Portfolio Recommendation + Chaos ════════════════════════════
     print("  📄 Slide 5: Portfolio Recommendation + Chaos Round...")
     slide5 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide5)
     add_title(slide5, "💼 Slide 5 — Portfolio Recommendation + Chaos Round",
               "Portfolio A (Equal) vs Portfolio B (Optimized) + Nifty -10% Stress Test")
     
-    # Portfolio comparison table
     if not portfolio.empty:
         add_text_box(slide5, Inches(0.5), Inches(1.3), Inches(4), Inches(0.3),
                     "Portfolio Comparison", size=13, color=ACCENT_CYAN, bold=True)
         add_table_to_slide(slide5, portfolio,
                           Inches(0.5), Inches(1.7), Inches(5.5), Inches(2.3), font_size=10)
     
-    # Portfolio cumulative value chart
     safe_add_picture(slide5, os.path.join(CHARTS_DIR, 'portfolio_comparison.png'),
                      Inches(6.3), Inches(1.2), Inches(6.8), Inches(2.8))
     
-    # Chaos round stress chart
     add_text_box(slide5, Inches(0.5), Inches(4.2), Inches(5), Inches(0.3),
                 "⚡ Chaos Round: Nifty -10% Stress Test", size=13, color=ACCENT_GOLD, bold=True)
     
@@ -328,10 +310,9 @@ def create_presentation():
                               Inches(6.5), Inches(4.6), Inches(6.3), Inches(1.8), font_size=10)
     
     add_text_box(slide5, Inches(6.5), Inches(6.6), Inches(6.3), Inches(0.5),
-                 "Portfolio B is strategically allocated to minimize drawdown using a defensive pivot.",
+                 "⚠️ Portfolio justification (200 words) must be presented live",
                  size=11, color=ACCENT_GOLD)
     
-    # ═══ SLIDE 6: ML Model ════════════════════════════════════════════════════
     print("  📄 Slide 6: ML Model...")
     slide6 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide6)
@@ -345,15 +326,12 @@ def create_presentation():
         add_table_to_slide(slide6, ml_comp,
                           Inches(0.5), Inches(1.65), Inches(7), Inches(1.0), font_size=11)
     
-    # Feature importance chart
     safe_add_picture(slide6, os.path.join(CHARTS_DIR, 'ml_feature_importance.png'),
                      Inches(0.3), Inches(2.9), Inches(6.5), Inches(2.5))
     
-    # Confusion matrix chart
     safe_add_picture(slide6, os.path.join(CHARTS_DIR, 'ml_confusion_matrix.png'),
                      Inches(6.8), Inches(1.3), Inches(6.3), Inches(2.8))
     
-    # ROC curve
     safe_add_picture(slide6, os.path.join(CHARTS_DIR, 'ml_roc_curve.png'),
                      Inches(6.8), Inches(4.2), Inches(6.3), Inches(3))
     
@@ -367,41 +345,21 @@ def create_presentation():
                  size=11, color=TEXT_GRAY)
     
     add_text_box(slide6, Inches(0.5), Inches(7.0), Inches(12), Inches(0.4),
-                 "Top 3 Features: Rel_return_20d, Vol_60d, MACD_hist. Financial interpretation provided in separate document.",
+                 "⚠️ Top 3 features and financial interpretation must be explained live by YOU (AI policy)",
                  size=11, color=ACCENT_GOLD)
     
-    # ═══ SLIDE 7: n8n Demo ════════════════════════════════════════════════════
     print("  📄 Slide 7: n8n Demo...")
     slide7 = prs.slides.add_slide(blank_layout)
     set_slide_bg(slide7)
     add_title(slide7, "⚙️ Slide 7 — n8n Automation Demo",
               "Price Alert Workflow — Live Execution")
     
-    # n8n workflow diagram
     n8n_diagram = os.path.join(CHARTS_DIR, 'n8n_workflow_diagram.png')
     if not safe_add_picture(slide7, n8n_diagram, Inches(0.3), Inches(1.3), Inches(8), Inches(4.5)):
         # Fallback: try n8n directory
         n8n_diagram2 = os.path.join(BASE_DIR, 'n8n', 'n8n_workflow_diagram.png')
         safe_add_picture(slide7, n8n_diagram2, Inches(0.3), Inches(1.3), Inches(8), Inches(4.5))
     
-    # Workflow description
-    n8n_lines = [
-        ("WORKFLOW: PRICE ALERT MONITOR", 14, ACCENT_CYAN, True),
-        ("", 6, TEXT_GRAY, False),
-        ("Purpose:", 12, ACCENT_GOLD, True),
-        ("Automated monitoring replaces manual daily checks,", 12, TEXT_GRAY, False),
-        ("ensuring the fund manager is immediately notified", 12, TEXT_GRAY, False),
-        ("of significant price movements requiring action.", 12, TEXT_GRAY, False),
-        ("", 6, TEXT_GRAY, False),
-        ("Configuration:", 12, ACCENT_GOLD, True),
-        ("• Stocks: HDFCBANK, TCS, SUNPHARMA", 12, TEXT_GRAY, False),
-        ("• Schedule: Mon–Fri at 4:00 PM IST (post NSE close)", 12, TEXT_GRAY, False),
-        ("• Threshold: Alert if any stock moves >2%", 12, TEXT_GRAY, False),
-        ("• Action: Email alert with ticker, price, change %", 12, TEXT_GRAY, False),
-        ("", 6, TEXT_GRAY, False),
-        ("📺 LIVE DEMO:", 13, ACCENT_GREEN, True),
-        ("Import JSON → Execute workflow → Show alert output", 12, TEXT_GRAY, False),
-    ]
     add_multi_text_box(slide7, Inches(8.5), Inches(1.3), Inches(4.5), Inches(5.5), n8n_lines)
     
     add_text_box(slide7, Inches(0.5), Inches(6.2), Inches(12), Inches(0.8),
@@ -410,12 +368,10 @@ def create_presentation():
                  "Sends alert via email to fund manager",
                  size=11, color=TEXT_GRAY)
     
-    # ── Save ──
     pptx_path = os.path.join(SUBMISSIONS_DIR, 'presentation.pptx')
     prs.save(pptx_path)
     print(f"\n💾 Presentation saved: {pptx_path}")
-    
-    # Note: User should export to PDF for final submission
+    print("📌 Note: Export the .pptx to PDF for final submission")
     print("📌 Note: Export the .pptx to PDF for final submission")
     
     return pptx_path
@@ -430,4 +386,4 @@ if __name__ == '__main__':
     print(f"\nDeliverables:")
     print(f"  📄 {pptx_path}")
     print(f"\n📌 Remember to export to PDF before submission")
-    print(f"✅ Your deck is now ready with all updated values and removed AI mentions.")
+    print(f"⚠️  Review all slides and add your own financial interpretations")

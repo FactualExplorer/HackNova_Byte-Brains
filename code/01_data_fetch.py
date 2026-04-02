@@ -12,27 +12,22 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-# ── Configuration ──────────────────────────────────────────────────────────
 TICKERS = {
-    # Banking
     'HDFCBANK.NS': ('HDFCBANK', 'Banking'),
     'ICICIBANK.NS': ('ICICIBANK', 'Banking'),
     'SBIN.NS': ('SBIN', 'Banking'),
     'KOTAKBANK.NS': ('KOTAKBANK', 'Banking'),
     'AXISBANK.NS': ('AXISBANK', 'Banking'),
-    # IT
     'TCS.NS': ('TCS', 'IT'),
     'INFY.NS': ('INFY', 'IT'),
     'WIPRO.NS': ('WIPRO', 'IT'),
     'HCLTECH.NS': ('HCLTECH', 'IT'),
     'TECHM.NS': ('TECHM', 'IT'),
-    # Pharma
     'SUNPHARMA.NS': ('SUNPHARMA', 'Pharma'),
     'DRREDDY.NS': ('DRREDDY', 'Pharma'),
     'CIPLA.NS': ('CIPLA', 'Pharma'),
     'DIVISLAB.NS': ('DIVISLAB', 'Pharma'),
     'APOLLOHOSP.NS': ('APOLLOHOSP', 'Pharma'),
-    # Benchmark
     '^NSEI': ('NIFTY50', 'Benchmark'),
 }
 
@@ -64,26 +59,21 @@ def fetch_data():
                 quality_issues.append(f"❌ {name}: No data returned")
                 continue
             
-            # Standardize column names
             df = df[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']].copy()
             df.index = pd.to_datetime(df.index).tz_localize(None)
             df['Ticker'] = name
             df['Sector'] = sector
-            
-            # Check data quality
             n_rows = len(df)
             n_missing = df[['Open', 'High', 'Low', 'Close', 'Adj Close']].isnull().sum().sum()
             
-            # Check for consecutive missing trading days
             date_range = pd.bdate_range(start=df.index.min(), end=df.index.max())
             missing_dates = date_range.difference(df.index)
             
-            # Find max consecutive missing days
             max_consecutive = 0
             if len(missing_dates) > 0:
                 consecutive = 1
                 for i in range(1, len(missing_dates)):
-                    if (missing_dates[i] - missing_dates[i-1]).days <= 3:  # account for weekends
+                    if (missing_dates[i] - missing_dates[i-1]).days <= 3:
                         consecutive += 1
                     else:
                         max_consecutive = max(max_consecutive, consecutive)
@@ -100,14 +90,12 @@ def fetch_data():
             if max_consecutive > 5:
                 quality_issues.append(f"⚠️ {name}: {max_consecutive} consecutive missing trading days (exceeds 5-day threshold)")
             
-            # Check for zero or negative prices
             if (df['Adj Close'] <= 0).any():
                 n_bad = (df['Adj Close'] <= 0).sum()
                 quality_issues.append(f"⚠️ {name}: {n_bad} zero/negative Adj Close values — replaced with forward fill")
                 df.loc[df['Adj Close'] <= 0, 'Adj Close'] = np.nan
                 df['Adj Close'].fillna(method='ffill', inplace=True)
             
-            # Check for extreme outliers (daily return > 25%)
             daily_ret = df['Adj Close'].pct_change()
             extreme = (daily_ret.abs() > 0.25).sum()
             if extreme > 0:
@@ -125,7 +113,6 @@ def fetch_data():
 def export_data(all_data, quality_issues):
     """Export raw and cleaned datasets + quality note."""
     
-    # ── Combine all data ──
     combined = []
     for name, df in all_data.items():
         temp = df.copy()
@@ -136,30 +123,24 @@ def export_data(all_data, quality_issues):
     full_df = full_df[['Date', 'Ticker', 'Sector', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']]
     full_df.sort_values(['Ticker', 'Date'], inplace=True)
     
-    # ── Export raw dataset ──
     raw_path = os.path.join(DATA_DIR, 'raw_dataset.csv')
     full_df.to_csv(raw_path, index=False)
     print(f"\n💾 Raw dataset saved: {raw_path} ({len(full_df)} rows)")
     
-    # ── Export cleaned dataset ──
     cleaned_path = os.path.join(DATA_DIR, 'cleaned_dataset.csv')
     full_df.to_csv(cleaned_path, index=False)
     print(f"💾 Cleaned dataset saved: {cleaned_path}")
     
-    # ── Export Adj Close pivot (for downstream scripts) ──
     adj_close = full_df.pivot_table(index='Date', columns='Ticker', values='Adj Close')
     adj_close.sort_index(inplace=True)
     adj_close_path = os.path.join(DATA_DIR, 'adj_close_pivot.csv')
     adj_close.to_csv(adj_close_path)
     print(f"💾 Adj Close pivot saved: {adj_close_path}")
-    
-    # ── Export OHLCV per stock (for SMA charts) ──
     for name, df in all_data.items():
         stock_path = os.path.join(DATA_DIR, f'{name}_ohlcv.csv')
         df.to_csv(stock_path)
     print(f"💾 Individual OHLCV files saved to {DATA_DIR}/")
     
-    # ── Generate Data Quality Note ──
     quality_note = f"""# Data Quality Note — HackNova 1.0 PortfolioIQ
 
 ## Data Source
@@ -213,7 +194,7 @@ if __name__ == '__main__':
     full_df = export_data(all_data, quality_issues)
     
     print("\n" + "=" * 60)
-    print("✅ TASK 1 COMPLETE — Data Acquisition & Quality")
+    print("Task 1 complete — Data Acquisition & Quality")
     print("=" * 60)
     print(f"\nDeliverables:")
     print(f"  📊 data/raw_dataset.csv")
