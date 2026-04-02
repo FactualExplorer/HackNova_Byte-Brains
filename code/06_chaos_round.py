@@ -1,7 +1,6 @@
 """
-Task 6 (Chaos Round): Stress Test
-Scenario: Nifty 50 drops 10% in a single week.
-Uses Beta to estimate expected loss per stock, Portfolio A, and Portfolio B.
+Chaos Round: Stress Test
+Scenario: Nifty 50 drops 10% in a week.
 """
 
 import pandas as pd
@@ -13,12 +12,13 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+# Paths──
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 SUBMISSIONS_DIR = os.path.join(BASE_DIR, 'submissions')
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
-NIFTY_DROP = -0.10
+NIFTY_DROP = -0.10  # 10% drop scenario
 
 SECTOR_MAP = {
     'HDFCBANK': 'Banking', 'ICICIBANK': 'Banking', 'SBIN': 'Banking',
@@ -37,21 +37,21 @@ SECTOR_COLORS = {
 
 
 def run_stress_test():
-    """Run Chaos Round stress test."""
-    print("=" * 60)
-    print("CHAOS ROUND: STRESS TEST")
-    print(f"Scenario: Nifty 50 drops {abs(NIFTY_DROP)*100:.0f}% in one week")
-    print("=" * 60)
+    """Run stress test scenario."""
+    print(f"\nStress test: Nifty 50 drops {abs(NIFTY_DROP)*100:.0f}%")
     
+    # Load metrics
     metrics = pd.read_csv(os.path.join(SUBMISSIONS_DIR, 'metrics_summary.csv'))
     
+    # Load portfolio allocations
     alloc = pd.read_csv(os.path.join(SUBMISSIONS_DIR, 'portfolio_allocations.csv'))
     
+    # Per-stock expected loss
     stress_results = []
     for _, row in metrics.iterrows():
         ticker = row['Ticker']
         beta = row['Beta vs Nifty 50']
-        expected_loss = beta * NIFTY_DROP * 100
+        expected_loss = beta * NIFTY_DROP * 100  # as percentage
         
         stress_results.append({
             'Ticker': ticker,
@@ -64,15 +64,16 @@ def run_stress_test():
     
     stress_df = pd.DataFrame(stress_results)
     
+    # Most exposed & safest refuge
     most_exposed_idx = stress_df['Expected Loss (%)'].idxmin()
     safest_idx = stress_df['Expected Loss (%)'].idxmax()
     most_exposed = stress_df.loc[most_exposed_idx]
     safest = stress_df.loc[safest_idx]
     
-    print(f"\n  🔴 Most Exposed: {most_exposed['Ticker']} (Beta: {most_exposed['Beta']:.4f}, Expected Loss: {most_exposed['Expected Loss (%)']:.2f}%)")
-    print(f"  🟢 Safest Refuge: {safest['Ticker']} (Beta: {safest['Beta']:.4f}, Expected Loss: {safest['Expected Loss (%)']:.2f}%)")
+    print(f"  Most Exposed: {most_exposed['Ticker']} (Beta: {most_exposed['Beta']:.4f}, Loss: {most_exposed['Expected Loss (%)']:.2f}%)")
+    print(f"  Safest Refuge: {safest['Ticker']} (Beta: {safest['Beta']:.4f}, Loss: {safest['Expected Loss (%)']:.2f}%)")
     
-    print("\n  📊 Portfolio Stress Test:")
+    # Portfolio-level stress
     
     # Portfolio A (equal weight)
     weights_a = alloc.set_index('Ticker')['Portfolio A Weight (%)'].to_dict()
@@ -88,11 +89,13 @@ def run_stress_test():
         for _, r in stress_df.iterrows()
     )
     
-    print(f"     Portfolio A Expected Loss: {port_a_loss:.2f}%")
-    print(f"     Portfolio B Expected Loss: {port_b_loss:.2f}%")
+    print(f"Portfolio A loss: {port_a_loss:.2f}%")
+    print(f"Portfolio B loss: {port_b_loss:.2f}%")
     
+    # Save clean stress results
     stock_stress = stress_df.copy()
     
+    # Add portfolio rows to export
     stress_export = pd.concat([stress_df, pd.DataFrame([
         {'Ticker': 'PORTFOLIO A', 'Sector': 'Portfolio', 'Beta': '-', 'Expected Loss (%)': round(port_a_loss, 2)},
         {'Ticker': 'PORTFOLIO B', 'Sector': 'Portfolio', 'Beta': '-', 'Expected Loss (%)': round(port_b_loss, 2)},
@@ -103,16 +106,17 @@ def run_stress_test():
         {'Ticker': f"  → {safest['Ticker']}", 'Sector': '', 'Beta': '', 'Expected Loss (%)': ''},
     ])], ignore_index=True)
     
+    # Save
     stress_path = os.path.join(SUBMISSIONS_DIR, 'chaos_round_stress_test.csv')
     stress_export.to_csv(stress_path, index=False)
-    print(f"\n💾 Stress test saved: {stress_path}")
+    print(f"\nStress test saved: {stress_path}")
     
     return stock_stress, port_a_loss, port_b_loss, most_exposed, safest
 
 
 def generate_stress_chart(stock_stress, port_a_loss, port_b_loss, most_exposed, safest):
     """Generate stress test bar chart."""
-    print("\n📈 Generating Chaos Round Stress Chart...")
+    print("\nGenerating stress chart...")
     
     fig, ax = plt.subplots(figsize=(16, 9))
     fig.patch.set_facecolor('#0f172a')
@@ -196,7 +200,7 @@ def generate_stress_chart(stock_stress, port_a_loss, port_b_loss, most_exposed, 
     path = os.path.join(CHARTS_DIR, 'chaos_stress_test.png')
     plt.savefig(path, dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"   ✅ Saved: {path}")
+    print(f"  Saved: {path}")
 
 
 if __name__ == '__main__':
@@ -204,10 +208,10 @@ if __name__ == '__main__':
     generate_stress_chart(stock_stress, port_a_loss, port_b_loss, most_exposed, safest)
     
     print("\n" + "=" * 60)
-    print("Chaos Round done — Stress Test")
+    print("\nChaos round complete.")
     print("=" * 60)
     print(f"\nDeliverables:")
-    print(f"  📊 submissions/chaos_round_stress_test.csv")
-    print(f"  📈 charts/chaos_stress_test.png")
-    print(f"\n⚠️  Remember: You must defend WHY certain stocks are 'safe' or 'exposed'")
+    print(f"Deliverables:")
+    print(f"  submissions/chaos_round_stress_test.csv")
+    print(f"  charts/chaos_stress_test.png")
     print(f"    during the judge Q&A. The math is here — the judgment is yours.")

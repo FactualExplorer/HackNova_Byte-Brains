@@ -1,8 +1,6 @@
 """
-Task 5 (ML): Supervised Classifier for Relative Outperformance
-Builds two ML models (Random Forest + Gradient Boosting) to predict whether
-a stock outperforms Nifty 50 in the next 20 trading days.
-Temporal train/test split: 2023 train, 2024 test (no data leakage).
+ML Model: Supervised Classifier for Relative Outperformance
+Builds Random Forest and Gradient Boosting models to predict stock outperformance.
 """
 
 import pandas as pd
@@ -21,7 +19,7 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-
+# Paths──────────
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
@@ -37,14 +35,12 @@ SECTOR_MAP = {
 }
 
 TRADING_DAYS = 252
-FORWARD_WINDOW = 20
+FORWARD_WINDOW = 20  # Predict outperformance over next 20 trading days
 
 
 def build_features():
     """Build feature matrix for all stocks."""
-    print("=" * 60)
-    print("ML TASK: FEATURE ENGINEERING")
-    print("=" * 60)
+    print("\nFeature engineering...")
     
     adj_close = pd.read_csv(os.path.join(DATA_DIR, 'adj_close_pivot.csv'),
                             index_col=0, parse_dates=True)
@@ -65,15 +61,18 @@ def build_features():
         df['Sector'] = SECTOR_MAP[ticker]
         df['Date'] = df.index
         
+        # Price-based features
         df['Return_1d'] = returns
         df['Return_5d'] = returns.rolling(5).mean()
         df['Return_20d'] = returns.rolling(20).mean()
         df['Return_60d'] = returns.rolling(60).mean()
         
+        # Volatility features
         df['Vol_5d'] = returns.rolling(5).std()
         df['Vol_20d'] = returns.rolling(20).std()
         df['Vol_60d'] = returns.rolling(60).std()
         
+        # SMA features
         sma_10 = prices.rolling(10).mean()
         sma_50 = prices.rolling(50).mean()
         sma_200 = prices.rolling(200).mean()
@@ -82,12 +81,14 @@ def build_features():
         df['SMA_200_ratio'] = prices / sma_200
         df['SMA_50_200_ratio'] = sma_50 / sma_200
         
+        # RSI (14-day)
         delta = prices.diff()
         gain = delta.where(delta > 0, 0).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         rs = gain / loss
         df['RSI_14'] = 100 - (100 / (1 + rs))
         
+        # MACD
         ema_12 = prices.ewm(span=12).mean()
         ema_26 = prices.ewm(span=26).mean()
         macd = ema_12 - ema_26
@@ -96,10 +97,13 @@ def build_features():
         df['MACD_signal'] = signal_line
         df['MACD_hist'] = macd - signal_line
         
+        # Beta (rolling 60-day)
         cov_roll = returns.rolling(60).cov(nifty_returns)
         var_roll = nifty_returns.rolling(60).var()
         df['Beta_60d'] = cov_roll / var_roll
         
+        # Volume features
+        # Load OHLCV for volume
         try:
             ohlcv_path = os.path.join(DATA_DIR, f'{ticker}_ohlcv.csv')
             ohlcv = pd.read_csv(ohlcv_path, index_col=0, parse_dates=True)
@@ -109,8 +113,10 @@ def build_features():
         except:
             df['Volume_ratio_20d'] = np.nan
         
+        # Relative performance vs Nifty
         df['Rel_return_20d'] = returns.rolling(20).mean() - nifty_returns.rolling(20).mean()
         
+        # Target: Outperform Nifty 50 over next 20 days
         stock_fwd_return = prices.pct_change(FORWARD_WINDOW).shift(-FORWARD_WINDOW)
         nifty_fwd_return = nifty.pct_change(FORWARD_WINDOW).shift(-FORWARD_WINDOW)
         df['Target'] = (stock_fwd_return > nifty_fwd_return).astype(int)
@@ -123,16 +129,14 @@ def build_features():
     # Save feature matrix
     feature_path = os.path.join(DATA_DIR, 'ml_feature_matrix.csv')
     feature_df.to_csv(feature_path, index=False)
-    print(f"\n💾 Feature matrix saved: {feature_path} ({len(feature_df)} rows)")
+    print(f"Feature matrix saved: {feature_path} ({len(feature_df)} rows)")
     
     return feature_df
 
 
 def train_models(feature_df):
-    """Train Random Forest and XGBoost with temporal split."""
-    print("\n" + "=" * 60)
-    print("ML TASK: MODEL TRAINING & EVALUATION")
-    print("=" * 60)
+    """Train Random Forest and Gradient Boosting with temporal split."""
+    print("\\nModel training...")
     
     feature_cols = [
         'Return_1d', 'Return_5d', 'Return_20d', 'Return_60d',
@@ -146,13 +150,14 @@ def train_models(feature_df):
     df = feature_df.dropna(subset=feature_cols + ['Target', 'Date']).copy()
     df['Date'] = pd.to_datetime(df['Date'])
     
+    # ── Temporal split: 2023 train, 2024 test ──
     train = df[df['Date'] < '2024-01-01']
     test = df[df['Date'] >= '2024-01-01']
     
-    print(f"\n📊 Train set: {len(train)} rows (2023)")
-    print(f"📊 Test set:  {len(test)} rows (2024)")
-    print(f"📊 Target distribution (train): {train['Target'].value_counts().to_dict()}")
-    print(f"📊 Target distribution (test):  {test['Target'].value_counts().to_dict()}")
+    print(f"Train set: {len(train)} rows (2023)")
+    print(f"Test set:  {len(test)} rows (2024)")
+    print(f"Target dist (train): {train['Target'].value_counts().to_dict()}")
+    print(f"Target dist (test):  {test['Target'].value_counts().to_dict()}")
     
     X_train = train[feature_cols].values
     y_train = train['Target'].values
@@ -164,6 +169,7 @@ def train_models(feature_df):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
+    # ═══ Model 1: Random Forest ═══════════════════════════════════════════════
     print("\n🌲 Training Random Forest...")
     rf = RandomForestClassifier(
         n_estimators=200, max_depth=8, min_samples_leaf=20,
@@ -183,7 +189,8 @@ def train_models(feature_df):
     }
     print(f"   Accuracy: {rf_metrics['Accuracy']:.4f} | F1: {rf_metrics['F1 Score']:.4f} | AUC: {rf_metrics['AUC-ROC']:.4f}")
     
-    print("\n🚀 Training Gradient Boosting...")
+    # ═══ Model 2: Gradient Boosting ════════════════════════════════════════════
+    print("\nTraining Gradient Boosting...")
     gb_model = GradientBoostingClassifier(
         n_estimators=200, max_depth=6, learning_rate=0.05,
         subsample=0.8, max_features=0.8,
@@ -203,16 +210,18 @@ def train_models(feature_df):
     }
     print(f"   Accuracy: {xgb_metrics['Accuracy']:.4f} | F1: {xgb_metrics['F1 Score']:.4f} | AUC: {xgb_metrics['AUC-ROC']:.4f}")
     
+    # ═══ Comparison Table ═════════════════════════════════════════════════════
     comparison = pd.DataFrame([rf_metrics, xgb_metrics])
     for col in ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'AUC-ROC']:
         comparison[col] = comparison[col].round(4)
     
     comp_path = os.path.join(SUBMISSIONS_DIR, 'ml_comparison_table.csv')
     comparison.to_csv(comp_path, index=False)
-    print(f"\n💾 ML comparison table saved: {comp_path}")
+    print(f"ML comparison table saved: {comp_path}")
     print(comparison.to_string(index=False))
     
-    print("\n📊 Per-Sector Evaluation:")
+    # ═══ Per-Sector Evaluation ════════════════════════════════════════════════
+    print("\nPer-Sector Evaluation:")
     sector_results = []
     for sector in ['Banking', 'IT', 'Pharma']:
         sector_mask = test['Sector'] == sector
@@ -236,19 +245,21 @@ def train_models(feature_df):
     sector_eval_df = pd.DataFrame(sector_results)
     sector_eval_path = os.path.join(SUBMISSIONS_DIR, 'ml_sector_evaluation.csv')
     sector_eval_df.to_csv(sector_eval_path, index=False)
-    print(f"\n💾 Per-sector evaluation saved: {sector_eval_path}")
+    print(f"Per-sector evaluation saved: {sector_eval_path}")
     
+    # ═══ Feature Importance ════════════════════════════════════════════════════
     rf_importance = pd.Series(rf.feature_importances_, index=feature_cols).sort_values(ascending=False)
     xgb_importance = pd.Series(gb_model.feature_importances_, index=feature_cols).sort_values(ascending=False)
     
-    print("\n🔑 Top 5 Features (Random Forest):")
+    print("\nTop 5 Features (Random Forest):")
     for feat, imp in rf_importance.head(5).items():
         print(f"   {feat}: {imp:.4f}")
     
-    print("\n🔑 Top 5 Features (Gradient Boosting):")
+    print("\nTop 5 Features (Gradient Boosting):")
     for feat, imp in xgb_importance.head(5).items():
         print(f"   {feat}: {imp:.4f}")
     
+    # ═══ Save Classification Report ═══════════════════════════════════════════
     from sklearn.metrics import classification_report as cr_func
     rf_report = cr_func(y_test, rf_pred, output_dict=True, zero_division=0)
     xgb_report = cr_func(y_test, xgb_pred, output_dict=True, zero_division=0)
@@ -267,7 +278,7 @@ def train_models(feature_df):
     report_df = pd.DataFrame(report_rows)
     report_path = os.path.join(SUBMISSIONS_DIR, 'ml_classification_report.csv')
     report_df.to_csv(report_path, index=False)
-    print(f"\n💾 Classification report saved: {report_path}")
+    print(f"Classification report saved: {report_path}")
     
     return (rf_importance, xgb_importance, feature_cols, 
             rf_pred, xgb_pred, rf_proba, xgb_proba, y_test)
@@ -275,7 +286,7 @@ def train_models(feature_df):
 
 def generate_feature_importance_chart(rf_importance, xgb_importance, feature_cols):
     """Generate feature importance comparison chart."""
-    print("\n📈 Generating Feature Importance Chart...")
+    print("\nGenerating Feature Importance Chart...")
     
     fig, axes = plt.subplots(1, 2, figsize=(18, 9))
     fig.patch.set_facecolor('#0f172a')
@@ -318,7 +329,7 @@ def generate_feature_importance_chart(rf_importance, xgb_importance, feature_col
 
 def generate_confusion_matrix_chart(rf_pred, xgb_pred, y_test):
     """Generate confusion matrix heatmaps for both models."""
-    print("\n📈 Generating Confusion Matrix Charts...")
+    print("\nGenerating Confusion Matrix Charts...")
     
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
     fig.patch.set_facecolor('#0f172a')
@@ -355,7 +366,7 @@ def generate_confusion_matrix_chart(rf_pred, xgb_pred, y_test):
 def generate_roc_curve(rf_proba, xgb_proba, y_test):
     """Generate ROC curve for both models."""
     from sklearn.metrics import roc_curve, auc
-    print("\n📈 Generating ROC Curve...")
+    print("\nGenerating ROC Curve...")
     
     fig, ax = plt.subplots(figsize=(10, 8))
     fig.patch.set_facecolor('#0f172a')
@@ -408,13 +419,15 @@ if __name__ == '__main__':
     generate_roc_curve(rf_proba, xgb_proba, y_test)
     
     print("\n" + "=" * 60)
-    print("ML Task complete — Supervised Classifier")
+    print("\nML task complete.")
     print("=" * 60)
     print(f"\nDeliverables:")
-    print(f"  📊 data/ml_feature_matrix.csv")
-    print(f"  📊 submissions/ml_comparison_table.csv")
-    print(f"  📊 submissions/ml_sector_evaluation.csv")
-    print(f"  📊 submissions/ml_classification_report.csv")
-    print(f"  📈 charts/ml_feature_importance.png")
-    print(f"  📈 charts/ml_confusion_matrix.png")
-    print(f"  📈 charts/ml_roc_curve.png")
+    print(f"Submissons:")
+    print(f"  data/ml_feature_matrix.csv")
+    print(f"  submissions/ml_comparison_table.csv")
+    print(f"  submissions/ml_sector_evaluation.csv")
+    print(f"  submissions/ml_classification_report.csv")
+    print(f"Charts:")
+    print(f"  charts/ml_feature_importance.png")
+    print(f"  charts/ml_confusion_matrix.png")
+    print(f"  charts/ml_roc_curve.png")

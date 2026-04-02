@@ -1,6 +1,6 @@
 """
-Task 2: Risk & Return Analysis
-Computes all 6 required metrics for 15 stocks and generates charts.
+Risk & Return Analysis
+Computes metrics for 15 stocks and generates charts.
 """
 
 import pandas as pd
@@ -13,6 +13,7 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+# Paths─
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
@@ -20,8 +21,9 @@ SUBMISSIONS_DIR = os.path.join(BASE_DIR, 'submissions')
 os.makedirs(CHARTS_DIR, exist_ok=True)
 os.makedirs(SUBMISSIONS_DIR, exist_ok=True)
 
+# Constants
 TRADING_DAYS = 252
-RISK_FREE_RATE = 0.065
+RISK_FREE_RATE = 0.065  # 6.5% p.a.
 
 SECTOR_MAP = {
     'HDFCBANK': 'Banking', 'ICICIBANK': 'Banking', 'SBIN': 'Banking',
@@ -46,17 +48,18 @@ def load_data():
 
 
 def compute_metrics(adj_close):
-    """Compute all 6 metrics for each stock."""
-    print("=" * 60)
-    print("TASK 2: RISK & RETURN ANALYSIS")
-    print("=" * 60)
+    """Compute metrics for each stock."""
+    print("\nComputing metrics...")
     
+    # Separate benchmark
     stocks = [c for c in adj_close.columns if c != 'NIFTY50']
     nifty = adj_close['NIFTY50']
     
+    # Daily returns
     daily_returns = adj_close[stocks].pct_change().dropna()
     nifty_returns = nifty.pct_change().dropna()
     
+    # Align dates
     common_idx = daily_returns.index.intersection(nifty_returns.index)
     daily_returns = daily_returns.loc[common_idx]
     nifty_returns = nifty_returns.loc[common_idx]
@@ -69,25 +72,33 @@ def compute_metrics(adj_close):
         
         n_days = len(stock_returns)
         
+        # 1. Annualized Return (%)
         total_return = stock_prices.iloc[-1] / stock_prices.iloc[0]
         ann_return = (total_return ** (TRADING_DAYS / n_days)) - 1
         
+        # 2. Annualized Volatility (%)
         ann_vol = stock_returns.std() * np.sqrt(TRADING_DAYS)
         
+        # 3. Sharpe Ratio
         sharpe = (ann_return - RISK_FREE_RATE) / ann_vol
         
+        # 4. Beta vs Nifty 50
         aligned_stock = stock_returns.loc[common_idx]
         aligned_nifty = nifty_returns.loc[common_idx]
         cov_matrix = np.cov(aligned_stock, aligned_nifty)
         beta = cov_matrix[0, 1] / cov_matrix[1, 1]
         
+        # 5. Maximum Drawdown (%)
         cumulative = (1 + stock_returns).cumprod()
         running_max = cumulative.cummax()
         drawdown = (cumulative - running_max) / running_max
         max_drawdown = drawdown.min()
         
+        # 6. SMA values (computed here, detailed in Task 3)
         sma_50 = stock_prices.rolling(50).mean().iloc[-1]
         sma_200 = stock_prices.rolling(200).mean().iloc[-1]
+        
+        # Determine signal
         if sma_50 > sma_200:
             signal = 'Golden Cross'
         elif sma_50 < sma_200:
@@ -110,9 +121,9 @@ def compute_metrics(adj_close):
             'SMA Signal': signal,
         })
         
-        print(f"\n📊 {ticker} ({sector}):")
-        print(f"   Return: {ann_return*100:.2f}% | Vol: {ann_vol*100:.2f}% | Sharpe: {sharpe:.4f}")
-        print(f"   Beta: {beta:.4f} | Max DD: {max_drawdown*100:.2f}% | Signal: {signal}")
+        print(f"\n{ticker} ({sector}):")
+        print(f"      Return: {ann_return*100:.2f}% | Vol: {ann_vol*100:.2f}% | Sharpe: {sharpe:.4f}")
+        print(f"      Beta: {beta:.4f} | Max DD: {max_drawdown*100:.2f}% | Signal: {signal}")
     
     metrics_df = pd.DataFrame(results)
     return metrics_df, daily_returns
@@ -120,10 +131,11 @@ def compute_metrics(adj_close):
 
 def generate_risk_return_scatter(metrics_df):
     """Generate Risk-Return scatter plot."""
-    print("\n\n📈 Generating Risk-Return Scatter Plot...")
+    print("\nGenerating Risk-Return scatter plot...")
     
     fig, ax = plt.subplots(figsize=(14, 9))
     
+    # Set dark background
     fig.patch.set_facecolor('#0f172a')
     ax.set_facecolor('#1e293b')
     
@@ -145,6 +157,7 @@ def generate_risk_return_scatter(metrics_df):
                 bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.7, edgecolor='none')
             )
     
+    # Add risk-free rate line
     ax.axhline(y=6.5, color='#fbbf24', linestyle='--', alpha=0.6, linewidth=1, label='Risk-Free Rate (6.5%)')
     
     ax.set_xlabel('Annualized Volatility (%)', fontsize=13, color='white', fontweight='bold')
@@ -165,12 +178,12 @@ def generate_risk_return_scatter(metrics_df):
     path = os.path.join(CHARTS_DIR, 'risk_return_scatter.png')
     plt.savefig(path, dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"   ✅ Saved: {path}")
+    print(f"  Saved: {path}")
 
 
 def generate_correlation_heatmap(daily_returns):
     """Generate correlation heatmap of daily returns."""
-    print("\n📊 Generating Correlation Heatmap...")
+    print("\nGenerating correlation heatmap...")
     
     stocks_only = [c for c in daily_returns.columns if c != 'NIFTY50']
     corr = daily_returns[stocks_only].corr()
@@ -194,6 +207,7 @@ def generate_correlation_heatmap(daily_returns):
                  fontsize=16, color='white', fontweight='bold', pad=20)
     ax.tick_params(colors='#cbd5e1', labelsize=10)
     
+    # Color the tick labels by sector
     for label in ax.get_xticklabels():
         ticker = label.get_text()
         sector = SECTOR_MAP.get(ticker, 'Unknown')
@@ -209,18 +223,18 @@ def generate_correlation_heatmap(daily_returns):
     path = os.path.join(CHARTS_DIR, 'correlation_heatmap.png')
     plt.savefig(path, dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"   ✅ Saved: {path}")
+    print(f"  Saved: {path}")
 
 
 def save_metrics(metrics_df):
     """Save metrics summary table."""
     csv_path = os.path.join(SUBMISSIONS_DIR, 'metrics_summary.csv')
     metrics_df.to_csv(csv_path, index=False)
-    print(f"\n💾 Metrics summary saved: {csv_path}")
+    print(f"Metrics summary: {csv_path}")
     
     xlsx_path = os.path.join(SUBMISSIONS_DIR, 'metrics_summary.xlsx')
     metrics_df.to_excel(xlsx_path, index=False, sheet_name='Metrics')
-    print(f"💾 Metrics summary saved: {xlsx_path}")
+    print(f"Metrics summary: {xlsx_path}")
 
 
 if __name__ == '__main__':
@@ -230,11 +244,4 @@ if __name__ == '__main__':
     generate_risk_return_scatter(metrics_df)
     generate_correlation_heatmap(daily_returns)
     
-    print("\n" + "=" * 60)
-    print("TASK 2 COMPLETE — Risk & Return Analysis")
-    print("=" * 60)
-    print(f"\nDeliverables:")
-    print(f"  📊 submissions/metrics_summary.csv")
-    print(f"  📊 submissions/metrics_summary.xlsx")
-    print(f"  📈 charts/risk_return_scatter.png")
-    print(f"  📊 charts/correlation_heatmap.png")
+    print("\nTask 2 complete.")

@@ -1,6 +1,6 @@
 """
-Master Pipeline Runner — HackNova 2 PortfolioIQ
-Runs all tasks in sequence and prints final submission checklist.
+Master Pipeline Runner
+Runs all tasks in sequence.
 """
 
 import subprocess
@@ -25,10 +25,7 @@ TASKS = [
 def run_task(script_name, description):
     """Run a single task script."""
     script_path = os.path.join(SCRIPTS_DIR, script_name)
-    print(f"\n{'━' * 70}")
-    print(f"▶ RUNNING: {description}")
-    print(f"  Script: {script_name}")
-    print(f"{'━' * 70}")
+    print(f"\nRunning: {description}")
     
     start = time.time()
     try:
@@ -40,27 +37,25 @@ def run_task(script_name, description):
         
         if result.returncode == 0:
             print(result.stdout)
-            print(f"\n✅ {description} — PASSED ({elapsed:.1f}s)")
+            print(f"\nPassed ({elapsed:.1f}s)")
             return True
         else:
             print(result.stdout)
-            print(f"\n❌ STDERR:\n{result.stderr}")
-            print(f"\n❌ {description} — FAILED ({elapsed:.1f}s)")
+            print(f"\nError: {result.stderr}")
+            print(f"Failed ({elapsed:.1f}s)")
             return False
             
     except subprocess.TimeoutExpired:
-        print(f"\n⏱️ {description} — TIMEOUT (>300s)")
+        print(f"Timeout (>300s)")
         return False
     except Exception as e:
-        print(f"\n❌ {description} — ERROR: {e}")
+        print(f"Error: {e}")
         return False
 
 
 def check_deliverables():
     """Check final submission deliverables."""
-    print(f"\n\n{'═' * 70}")
-    print("📋 FINAL SUBMISSION CHECKLIST")
-    print(f"{'═' * 70}")
+    print("\\nFinal submission checklist:")
     
     deliverables = [
         ('data/raw_dataset.csv', 'Raw fetched dataset (15 stocks + Nifty 50)'),
@@ -99,12 +94,10 @@ def check_deliverables():
         if exists:
             size = os.path.getsize(full_path)
             size_str = f"{size/1024:.1f} KB" if size < 1048576 else f"{size/1048576:.1f} MB"
-            print(f"  ✅ {description:45s}  ({size_str})")
+            print(f"    {description:45s}  ({size_str})")
         else:
-            print(f"  ❌ {description:45s}  MISSING")
+            print(f"    {description:45s}  MISSING")
             all_ok = False
-    
-    print(f"\n{'─' * 70}")
     
     manual_items = [
         "Portfolio justification (200 words) — YOU must write this",
@@ -113,17 +106,15 @@ def check_deliverables():
         "Prepare judge Q&A answers using your computed metrics",
     ]
     
-    print("\n⚠️  MANUAL ITEMS (cannot be automated):")
+    print("\nManual items (not automated):")
     for item in manual_items:
-        print(f"  📌 {item}")
+        print(f"    - {item}")
     
     return all_ok
 
 
 if __name__ == '__main__':
-    print("═" * 70)
-    print("🚀 HackNova 2 — PortfolioIQ: FULL PIPELINE RUNNER")
-    print("═" * 70)
+    print("\nHackNova 2 — PortfolioIQ: Pipeline Runner")
     
     start_total = time.time()
     results = {}
@@ -132,26 +123,20 @@ if __name__ == '__main__':
         success = run_task(script, desc)
         results[desc] = success
         if not success:
-            print(f"\n⚠️  {desc} failed. Continuing with remaining tasks...")
+            print(f"\nWarning: {desc} failed")
     
     elapsed_total = time.time() - start_total
     
-    # Summary
-    print(f"\n\n{'═' * 70}")
-    print("📊 PIPELINE SUMMARY")
-    print(f"{'═' * 70}")
+    print(f"\nPipeline Summary:")
     
     for desc, success in results.items():
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"  {status}  {desc}")
+        status = "PASS" if success else "FAIL"
+        print(f"    {status}: {desc}")
     
     passed = sum(1 for s in results.values() if s)
     total = len(results)
-    print(f"\n  Result: {passed}/{total} tasks passed ({elapsed_total:.1f}s total)")
+    print(f"\nTotal: {passed}/{total} tasks passed ({elapsed_total:.1f}s)")
     
-    # Check deliverables
     check_deliverables()
     
-    print(f"\n{'═' * 70}")
-    print("🏁 PIPELINE COMPLETE")
-    print(f"{'═' * 70}")
+    print(f"\nPipeline complete.")

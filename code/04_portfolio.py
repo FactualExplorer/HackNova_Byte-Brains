@@ -1,7 +1,6 @@
 """
-Task 4: Portfolio Construction
+Portfolio Construction
 Builds Portfolio A (Equal Weight) and Portfolio B (Sharpe-optimized).
-Generates comparison table, sector breakdown, and portfolio chart.
 """
 
 import pandas as pd
@@ -13,13 +12,15 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+# Paths─
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 CHARTS_DIR = os.path.join(BASE_DIR, 'charts')
 SUBMISSIONS_DIR = os.path.join(BASE_DIR, 'submissions')
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
-CORPUS = 1_000_000
+# Constants
+CORPUS = 1_000_000  # Rs. 10,00,000
 TRADING_DAYS = 252
 RISK_FREE_RATE = 0.065
 
@@ -34,10 +35,9 @@ SECTOR_MAP = {
 
 def compute_portfolios():
     """Build Portfolio A (equal weight) and Portfolio B (optimized)."""
-    print("=" * 60)
-    print("TASK 4: PORTFOLIO CONSTRUCTION")
-    print("=" * 60)
+    print("\nComputing portfolios...")
     
+    # Load data
     adj_close = pd.read_csv(os.path.join(DATA_DIR, 'adj_close_pivot.csv'),
                             index_col=0, parse_dates=True)
     adj_close.sort_index(inplace=True)
@@ -47,65 +47,80 @@ def compute_portfolios():
     stocks = [c for c in adj_close.columns if c != 'NIFTY50']
     daily_returns = adj_close[stocks].pct_change().dropna()
     
-    print("\n📊 Portfolio A — Equal Weight")
+    # ═══ Portfolio A: Equal Weight ═══════════════════════════════════════════
+    print("\nPortfolio A — Equal Weight")
     n_stocks = len(stocks)
     equal_weight = 1.0 / n_stocks
     weights_a = pd.Series({s: equal_weight for s in stocks})
     alloc_a = {s: round(CORPUS / n_stocks, 2) for s in stocks}
     
+    # Portfolio daily returns
     port_a_returns = daily_returns.dot(weights_a)
     
+    # Portfolio metrics
     port_a_ann_return = ((1 + port_a_returns).prod() ** (TRADING_DAYS / len(port_a_returns))) - 1
     port_a_ann_vol = port_a_returns.std() * np.sqrt(TRADING_DAYS)
     port_a_sharpe = (port_a_ann_return - RISK_FREE_RATE) / port_a_ann_vol
     
+    # Sector exposure
     sector_exp_a = {}
     for sector in ['Banking', 'IT', 'Pharma']:
         sector_stocks = [s for s in stocks if SECTOR_MAP.get(s) == sector]
         sector_exp_a[sector] = sum(weights_a[s] for s in sector_stocks) * 100
     
     print(f"   Return: {port_a_ann_return*100:.2f}% | Vol: {port_a_ann_vol*100:.2f}% | Sharpe: {port_a_sharpe:.4f}")
-    print(f"   Sector: Banking {sector_exp_a['Banking']:.1f}% | IT {sector_exp_a['IT']:.1f}% | Pharma {sector_exp_a['Pharma']:.1f}%")
+    print(f"   Sectors: Banking {sector_exp_a['Banking']:.1f}% | IT {sector_exp_a['IT']:.1f}% | Pharma {sector_exp_a['Pharma']:.1f}%")
     
-    print("\n📄 Portfolio B — Recommended (Sharpe-Weighted)")
+    print("\nPortfolio B — Recommended (Sharpe-Weighted)")
     
+    # Strategy: Overweight high-Sharpe, low-Beta stocks; exclude worst performers
     sharpe_values = metrics.set_index('Ticker')['Sharpe Ratio']
     beta_values = metrics.set_index('Ticker')['Beta vs Nifty 50']
     
+    # Exclude stocks with negative Sharpe or very high Beta (risk management)
     eligible = sharpe_values[sharpe_values > 0].index.tolist()
     if len(eligible) < 5:
+        # If too few, take top 10 by Sharpe
         eligible = sharpe_values.nlargest(10).index.tolist()
     
+    # Weight by Sharpe ratio (shifted to be positive)
     sharpe_eligible = sharpe_values[eligible]
     sharpe_shifted = sharpe_eligible - sharpe_eligible.min() + 0.01
     
+    # Apply inverse-Beta tilt for risk reduction
     beta_eligible = beta_values[eligible]
     inv_beta = 1.0 / beta_eligible.clip(lower=0.3)
     
+    # Combined score
     combined_score = sharpe_shifted * inv_beta
     raw_weights = combined_score / combined_score.sum()
     
+    # Create full weight vector
     weights_b = pd.Series(0.0, index=stocks)
     for s in eligible:
         weights_b[s] = raw_weights[s]
     
+    # Normalize to sum to 1
     weights_b = weights_b / weights_b.sum()
     
     alloc_b = {s: round(weights_b[s] * CORPUS, 2) for s in stocks}
     
+    # Portfolio daily returns
     port_b_returns = daily_returns.dot(weights_b)
     
+    # Portfolio metrics
     port_b_ann_return = ((1 + port_b_returns).prod() ** (TRADING_DAYS / len(port_b_returns))) - 1
     port_b_ann_vol = port_b_returns.std() * np.sqrt(TRADING_DAYS)
     port_b_sharpe = (port_b_ann_return - RISK_FREE_RATE) / port_b_ann_vol
     
+    # Sector exposure
     sector_exp_b = {}
     for sector in ['Banking', 'IT', 'Pharma']:
         sector_stocks = [s for s in stocks if SECTOR_MAP.get(s) == sector]
         sector_exp_b[sector] = sum(weights_b[s] for s in sector_stocks) * 100
     
     print(f"   Return: {port_b_ann_return*100:.2f}% | Vol: {port_b_ann_vol*100:.2f}% | Sharpe: {port_b_sharpe:.4f}")
-    print(f"   Sector: Banking {sector_exp_b['Banking']:.1f}% | IT {sector_exp_b['IT']:.1f}% | Pharma {sector_exp_b['Pharma']:.1f}%")
+    print(f"   Sectors: Banking {sector_exp_b['Banking']:.1f}% | IT {sector_exp_b['IT']:.1f}% | Pharma {sector_exp_b['Pharma']:.1f}%")
     
     print("\n   Allocation (Rs.):")
     for s in sorted(alloc_b.keys(), key=lambda x: alloc_b[x], reverse=True):
@@ -115,7 +130,8 @@ def compute_portfolios():
     excluded = [s for s in stocks if weights_b[s] == 0]
     if excluded:
         print(f"\n   Excluded: {', '.join(excluded)}")
-
+    
+    # ═══ Save Comparison Table ════════════════════════════════════════════════
     comparison = pd.DataFrame({
         'Metric': ['Annualized Return (%)', 'Annualized Volatility (%)', 'Sharpe Ratio',
                    'Banking Exposure (%)', 'IT Exposure (%)', 'Pharma Exposure (%)'],
@@ -131,8 +147,9 @@ def compute_portfolios():
     
     comp_path = os.path.join(SUBMISSIONS_DIR, 'portfolio_comparison.csv')
     comparison.to_csv(comp_path, index=False)
-    print(f"\n💾 Portfolio comparison saved: {comp_path}")
+    print(f"Portfolio comparison saved: {comp_path}")
     
+    # Allocation Details
     alloc_df = pd.DataFrame({
         'Ticker': stocks,
         'Sector': [SECTOR_MAP[s] for s in stocks],
@@ -143,8 +160,9 @@ def compute_portfolios():
     })
     alloc_path = os.path.join(SUBMISSIONS_DIR, 'portfolio_allocations.csv')
     alloc_df.to_csv(alloc_path, index=False)
-    print(f"💾 Portfolio allocations saved: {alloc_path}")
+    print(f"Portfolio allocations saved: {alloc_path}")
     
+    # Sector Breakdown
     sector_breakdown = []
     for sector in ['Banking', 'IT', 'Pharma']:
         sector_stocks = [s for s in stocks if SECTOR_MAP.get(s) == sector]
@@ -164,17 +182,13 @@ def compute_portfolios():
     sector_df = pd.DataFrame(sector_breakdown)
     sector_path = os.path.join(SUBMISSIONS_DIR, 'sector_breakdown.csv')
     sector_df.to_csv(sector_path, index=False)
-    print(f"💾 Sector breakdown saved: {sector_path}")
+    print(f"Sector breakdown saved: {sector_path}")
     
-    template = f"""# Portfolio Justification — Fund Manager Note
+    # Portfolio Justification Template
+    template = f"""# Portfolio Justification
 
-> **⚠️ YOU MUST WRITE THIS YOURSELF (200 words) — AI assistance is prohibited per hackathon rules.**
-
-## Template (Replace with your own analysis):
-
-Dear Fund Manager,
-
-[Your 200-word justification here. Must address:]
+## Instructions
+Write a 200-word justification addressing:
 
 1. **Overweighted stocks:** Which stocks received higher allocation in Portfolio B and why
 2. **Excluded stocks:** Which stocks were excluded and the risk rationale
@@ -207,7 +221,7 @@ Dear Fund Manager,
 
 def generate_portfolio_chart(port_a_returns, port_b_returns):
     """Generate portfolio comparison chart."""
-    print("\n📈 Generating Portfolio Comparison Chart...")
+    print("\nGenerating portfolio chart...")
     
     cum_a = (1 + port_a_returns).cumprod() * CORPUS
     cum_b = (1 + port_b_returns).cumprod() * CORPUS
@@ -215,6 +229,7 @@ def generate_portfolio_chart(port_a_returns, port_b_returns):
     fig, axes = plt.subplots(1, 2, figsize=(18, 8))
     fig.patch.set_facecolor('#0f172a')
     
+    # Chart 1: Cumulative value
     ax1 = axes[0]
     ax1.set_facecolor('#1e293b')
     ax1.plot(cum_a.index, cum_a, color='#94a3b8', linewidth=2, label='Portfolio A (Equal)')
@@ -241,6 +256,7 @@ def generate_portfolio_chart(port_a_returns, port_b_returns):
     from matplotlib.ticker import FuncFormatter
     ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'₹{x/100000:.1f}L'))
     
+    # Chart 2: Rolling Sharpe
     ax2 = axes[1]
     ax2.set_facecolor('#1e293b')
     
@@ -267,7 +283,7 @@ def generate_portfolio_chart(port_a_returns, port_b_returns):
     path = os.path.join(CHARTS_DIR, 'portfolio_comparison.png')
     plt.savefig(path, dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"   ✅ Saved: {path}")
+    print(f"  Saved: {path}")
 
 
 CORPUS = 1_000_000
@@ -277,12 +293,4 @@ if __name__ == '__main__':
     weights_a, weights_b, comparison, port_a_returns, port_b_returns = compute_portfolios()
     generate_portfolio_chart(port_a_returns, port_b_returns)
     
-    print("\n" + "=" * 60)
-    print("Task 4 COMPLETE — Portfolio Construction")
-    print("=" * 60)
-    print(f"\nDeliverables:")
-    print(f"  submissions/portfolio_comparison.csv")
-    print(f"   submissions/portfolio_allocations.csv")
-    print(f"   submissions/sector_breakdown.csv")
-    print(f"   charts/portfolio_comparison.png")
-    print(f"   submissions/portfolio_justification_TEMPLATE.md (⚠️ YOU must fill this in)")
+    print("\nTask 4 complete.")
